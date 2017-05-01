@@ -1,0 +1,340 @@
+
+Linear Regression in R: Some methods for data exploration and model fitting
+========================================================
+transition:rotate
+width:1200
+Peer Christensen
+
+Can we predict rum ratings based on price and sugar content?
+========================================================
+
+- Exploring the data - variables, correlations and diagnostics
+- Fitting regression models using different approaches 
+- Using cross-validation techniques to test our final model
+- Exploring ways to plot our predictor and outcomes variables
+
+The data
+========================================================
+```{r,echo=F}
+setwd("/Users/peerchristensen/Desktop/rum project")
+rum = read.csv2("rum_to_R.csv",header=T,stringsAsFactors = T,sep=";")
+aged=subset(rum,Category=="Aged")
+aged=droplevels(aged)
+aged=na.omit(aged)
+```
+<font size="5">
+```{r,echo=T,eval=F}
+rum = read.csv2("rum_to_R.csv",header=T,stringsAsFactors = T,sep=";")
+aged=subset(rum,Category=="Aged" & Sugar!="NA" & Price !="NA")
+```
+```{r,echo=T}
+library(broom)
+glance(aged)
+aged[c(3,5,31,53,78),]
+```
+</font> 
+
+Outliers
+========================================================
+```{r fig.align="center"}
+boxplot(aged$Price)
+```
+***
+```{r fig.align="center"}
+boxplot(aged$Sugar)
+```
+
+=========================================================
+```{r,out.width="1920px"}
+boxplot.stats(aged$Price) #$out = outliers
+```
+
+==============
+<font size="6">
+```{r}
+q_three=summary(aged$Price)[5] #3rd quartile
+q_three
+iqr_price=IQR(aged$Price) #interquartile range
+iqr_price
+high_val_price = (iqr_price * 1.5) + q_three #calculate cut-off point
+high_val_price
+aged=subset(aged,Price <= high_val_price) #remove rows with values above cut-off point
+```
+</font>
+
+Correlations and collinearity
+===
+
+<font size="6">
+```{r fig.width=7,fig.height=7, fig.align='center'}
+pairs(aged[,c(4,6:7)],panel = panel.smooth)
+```
+</font>
+
+***
+
+<font size="6">
+```{r fig.width=7,fig.height=7,fig.align='center'}
+library(car)
+scatterplotMatrix(~Rating+Price+Sugar,aged)
+```
+</font>
+
+===
+<font size="6">
+```{r fig.width=7,fig.height=7, fig.align="center"}
+library(ggplot2)
+library(GGally)
+ggpairs(aged[c(6:7,4)],
+        lower=list(continuous="smooth_loess"))
+```
+</font>
+
+***
+<font size="6">
+```{r fig.width=7,fig.height=7,fig.align="center"}
+library(RColorBrewer)
+col=brewer.pal(11,"PRGn")
+library(corrgram)
+corrgram(aged[,4:7],
+        col.regions=colorRampPalette(col[c(2:5,7:10)]))
+```
+</font>
+
+===
+
+<font size="3">
+```{r}
+library(Hmisc)
+rcorr(as.matrix(mtcars))
+```
+</font>
+
+***
+
+<font size="6">
+```{r fig.width=11,fig.height=11}
+library(corrplot)
+corrplot(cor(mtcars))
+```
+</font>
+
+Variable distributions and transformation
+===
+<font size="5">
+```{r fig.width=6,fig.height=6,fig.align="center"}
+hist(aged$Price,breaks=15,col="red",freq=F)
+curve(dnorm(x,mean=mean(aged$Price),
+        sd=sd(aged$Price)),add=TRUE,lwd=4)
+```
+***
+
+```{r fig.width=7,fig.height=7,fig.align="center"}
+hist(log(aged$Price),breaks=15,col="red",freq=F)
+curve(dnorm(x,mean=mean(log(aged$Price)),
+        sd=sd(log(aged$Price))),add=TRUE,lwd=4)
+```
+</font>
+
+Variable statistics
+=====
+<font size="4">
+```{r}
+library(pastecs)
+round(stat.desc(data.frame(aged$Price,log(aged$Price),
+        aged$Sugar,aged$Rating),basic=F,norm=T),2)
+```
+</font>
+***
+<font size="5">
+- skewness: should be 0, positive val indicates pile-up on the left side
+- skew.2SE: skew / 2*SE, if absolute val greater than 1, skew is significant at p < .05
+- kurtosis: should be 0, positive val indicate pointy (leptokurtic) shape
+- kurt.2SE: kurtosis / 2*SE, if absolute val greater than 1, skew is significant at p < .05
+- normtest.W: Shapiro–Wilk test of normality
+- normtest.p: p-val for normality test, should be above .05
+</font>
+
+Building a model
+===
+<font size="5">
+Model 1: Rating ~ Price
+```{r}
+mod1 = lm(Rating ~ log(Price), data = aged, weights = Raters)
+summary(mod1)
+```
+</font>
+
+===
+<font size="5">
+Model 2: Rating ~ Price + Sugar
+```{r}
+mod2 = lm(Rating ~ log(Price) + Sugar, data = aged, weights = Raters)
+summary(mod2)
+```
+</font>
+
+Comparing models
+===
+
+Using ANOVA
+```{r}
+anova(mod1,mod2)
+```
+
+===
+
+Using Akaike's Information Criterion (AIC)
+```{r}
+AIC(mod1,mod2)
+```
+
+and Bayes' Information Criterion (BIC)
+```{r}
+BIC(mod1,mod2)
+```
+
+The stepwise approach
+===
+<font size="4">
+```{r}
+stepmod = lm(Rating ~ log(Price)*Price*Sugar, weights=Raters,data=aged)
+step(stepmod)
+```
+</font>
+
+Model diagnostics
+===
+
+Some key terms:
+- Residual: The difference between a fitted and an observed value
+- Leverage: A measure of how far an predictor variable deviates from its mean. High leverage points can have a great amount of effect on the estimate of regression coefficients.
+- Influence: An observation is said to be influential if removing the observation substantially changes the estimate of the regression coefficients.  Influence can be thought of as the product of leverage and outlierness"
+- Cook's distance (or Cook's D): A measure that combines the information of leverage and residual of the observation.
+
+Residual plots
+===
+```{r}
+library(car)
+residualPlots(mod2)
+```
+
+Marginal plots
+===
+```{r}
+marginalModelPlots(mod2)
+```
+
+===
+<font size="6">
+```{r}
+library(broom)
+round(head(augment(mod2)[,2:6]),2)
+round(head(augment(mod2)[,7:11]),2)
+```
+</font>
+
+Robust regression
+===
+<font size="5">
+```{r}
+library(robustbase)
+rmod4c=lmrob(Rating~log(Price)+Sugar,weights=Raters,aged)
+summary(rmod4c)
+```
+</font>
+
+Plotting how observations are weighted
+===
+<font size="5">
+```{r fig.width=9, fig.height=7,fig.align="center"}
+aged$rweights=rmod4c$rweights
+library(ggplot2)
+qplot(log(Price), Rating, size = 1-rweights, color=rweights,data=aged) +geom_smooth(size=1,col="gold3")
+```
+Note that we've inverted the weights here!
+</font>
+
+Plotting our model
+===
+
+2D interactive scatterplot using Plotly
+```{r,eval=F}
+library(plotly)
+plot_2d = plot_ly(aged, type="scatter", x = ~log(Price),
+                y~aged$Rating, 
+                size = ~Sugar,sizes=c(300,1500), 
+                color=~Sugar,
+                text = ~paste(Label),mode="markers") %>%
+                        layout(title="Relationship Between Rum 
+                               Price and Average Rating")
+```
+
+Interactive 3D plot
+===
+```{r,eval=F}
+plot_3d = plot_ly(x=log(aged$Price),y=aged$Sugar,z=aged$Rating,
+        type="scatter3d",mode='markers',size=aged$Raters,
+        color=aged$Sugar,text=aged$Label,sizes=c(600,2500)) %>%
+                layout(scene=list(
+                        xaxis=list(title="Price"),
+                        yaxis=list(title="Sugar"),
+                        zaxis=list(title="Rating")))
+```
+
+Cross-validation
+===
+
+How well does our model generalize to "unseen" data?
+
+- Divide data into a training and a test set
+- Fit model on training set
+- Predict values for the test set
+- Compute errors (difference between actual and predicted values)
+- Calculate the root mean squared error (RMSE)
+
+===
+<font size="5">
+```{r}
+# Shuffle row indices: rows
+rows <- sample(nrow(aged))
+# Randomly order data
+x <- aged[rows, ]
+# Determine row to split on: split
+split = round(nrow(x) * .8)
+# Create train
+train = x[1:split,]
+# Create test
+test=x[(split+1):nrow(x),]
+#2b. predict on test set
+# Fit lm model on train: model
+model=lm(Rating~log(Price)+Sugar,weights=Raters,train)
+#RMSE on train set:
+sqrt(mean((model$fitted-train$Rating)^2))
+# Predict on test: p
+p=predict(model,test)
+# Compute errors: error
+error=p-test[["Rating"]] 
+# Calculate RMSE on test set
+sqrt(mean(error^2)) 
+```
+</font>
+
+5x5 folds Cross-validation using caret
+===
+<font size="5">
+```{r}
+set.seed(621)
+library(caret)
+model <- train(Rating ~ log(Price)+Sugar, train,
+        preProcess=c("center","scale"),
+        method = "lm", 
+        trControl = trainControl(
+                method = "cv", 
+                number = 5,
+                repeats = 5, 
+                verboseIter = F)
+        )
+model
+```
+</font>
