@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-P Christensen
+Author: Peer Christensen
+
+This script does the following:
 
 1.
 Scrape a list of rum label names with sugar content.
@@ -8,6 +10,7 @@ The data is then stored in a csv file.
 
 2.
 Scrape mean ratings and other metadata about rums
+
 """
 from lxml import html
 import requests
