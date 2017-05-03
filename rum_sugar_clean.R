@@ -8,7 +8,7 @@
 #------------------------------------------------
 
 setwd("/Users/peerchristensen/Desktop/rum project")
-rum_dat = read.csv("rumratings2.csv", header=F,stringsAsFactors = F,sep=";")
+rum_dat = read.csv("rumratings.csv", header=F,stringsAsFactors = F,sep=";")
 colnames(rum_dat) <- c("Label", "Country", "Rating", "Raters", "Price")
 rum_dat$Country=as.factor(rum_dat$Country)
 rum_dat$Raters=as.numeric(rum_dat$Raters)
